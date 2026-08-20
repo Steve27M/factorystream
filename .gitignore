@@ -1,0 +1,76 @@
+# --- FactoryStream ---
+# Generated event streams, manifests, and parquet. All synthetic and all
+# reproducible from a seed, so there is no reason to carry them in git.
+out/
+data/
+*.parquet
+*.jsonl
+!tests/fixtures/*.jsonl
+
+# --- Cloud ---
+# Terraform state contains secrets and resource identifiers.
+# Recursive, because modules nest (account/, app/) and a rule anchored one
+# level deep would silently miss state in a submodule.
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+# Saved plan files embed resolved variable values, including anything sensitive
+# that was passed at plan time.
+tfplan
+*.tfplan
+crash.log
+crash.*.log
+
+# The lock file SHOULD normally be committed — it pins provider versions. It is
+# excluded here only until the first commit settles which platforms matter.
+.terraform.lock.hcl
+
+# There are NO long-lived AWS keys in this project — CI authenticates by GitHub
+# OIDC role assumption (decisions entry 7). These patterns exist so an
+# accidentally-created credential file cannot be committed by reflex.
+.aws/
+aws-credentials*
+*.pem
+*.key
+*secret*
+.env
+.env.local
+
+# Evidence ledger may contain account identifiers; curate before committing.
+evidence/**/raw/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# --- dbt ---
+transform/target/
+transform/dbt_packages/
+transform/logs/
+# dbt writes an anonymous-usage id here; it is machine-local, not config.
+transform/.user.yml
+# NOTE: transform/profiles.yml IS committed. It holds no credentials — bucket
+# names come from env_var and auth is the ambient AWS chain. Excluding it
+# would hide the one file a reader needs to understand how dbt is wired.
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+CLAUDE.md

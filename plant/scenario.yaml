@@ -1,0 +1,40 @@
+# Scenario: what to generate, and how badly to break it.
+#
+# The disorder rates below are the defaults from the build spec. They are
+# configuration rather than constants because the pipeline's handling of each
+# class must be testable at a *declared* rate — "we handle duplicates" is a
+# claim, "we removed exactly the 41 extra copies injected" is a proof.
+
+run:
+  seed: 42
+  start_date: 2026-03-02        # a Monday
+  days: 1
+
+disorder:
+  # Late arrival: publish_time pushed far past event_time. Stresses watermarks
+  # and window re-statement.
+  late_rate: 0.02
+  late_max_hours: 6.0
+
+  # Duplicate publish: the same event_id republished 1-3 extra times, byte
+  # identical, as a broker retry would. Stresses dedupe keys and idempotency.
+  duplicate_rate: 0.01
+  duplicate_max_extra: 3
+
+  # Out-of-order *within a machine* — the ordering Kafka actually guarantees,
+  # and therefore the assumption a pipeline is most likely to lean on.
+  out_of_order_rate: 0.03
+  out_of_order_max_shift: 12
+
+  # Two machines get a wandering clock. The realistic failure: one controller's
+  # NTP is broken and nobody has noticed.
+  skewed_machines: 2
+  skew_max_seconds: 90.0
+
+  # One cutover at the midpoint: everything after is v2 (adds line_id, renames
+  # operator -> operator_badge on cycle events). A deployment, not a scatter.
+  schema_drift_at: 0.5
+
+  # Unparseable payloads. Must be quarantined with offset provenance — never
+  # silently dropped, never fatal to the consumer.
+  corrupt_rate: 0.001

@@ -1,0 +1,28 @@
+version: 2
+
+models:
+  - name: completeness_ledger
+    description: >
+      One row per window per machine. `status` is reconciled / pending / broken.
+      A broken row after the watermark fails the build and carries its own
+      root-cause note — a completeness gate that does not gate is a decoration
+      (decisions entry 10).
+    columns:
+      - name: status
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['reconciled', 'pending', 'broken']
+      - name: machine_id
+        data_tests: [not_null]
+      - name: window_start
+        data_tests: [not_null]
+    data_tests:
+      # THE gate. Any broken window fails `dbt build`, which fails CI.
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "status != 'broken'"
+          config:
+            severity: error
+            error_if: ">0"

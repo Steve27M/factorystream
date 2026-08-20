@@ -1,0 +1,44 @@
+version: 2
+
+models:
+  - name: dim_machine
+    columns:
+      - name: machine_id
+        data_tests: [unique, not_null]
+
+  - name: fct_cycles
+    description: One row per completed unit. count(*) equals units produced.
+    columns:
+      - name: cycle_key
+        data_tests: [unique, not_null]
+      - name: machine_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_machine')
+                field: machine_id
+      - name: duration_s
+        data_tests:
+          - not_null
+
+  - name: fct_defects
+    columns:
+      - name: defect_key
+        data_tests: [unique, not_null]
+      - name: machine_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_machine')
+                field: machine_id
+
+  - name: agg_window_machine
+    description: >
+      Grained to match the generator manifest exactly. The completeness ledger
+      compares this against ground truth.
+    columns:
+      - name: machine_id
+        data_tests: [not_null]
+      - name: window_start
+        data_tests: [not_null]

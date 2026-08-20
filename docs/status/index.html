@@ -1,0 +1,154 @@
+<!doctype html>
+<meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>FactoryStream — completeness ledger</title>
+<style>
+  :root {
+    --bg:#fbfbfa; --fg:#1c1c1a; --muted:#6b6b66; --line:#e3e3df;
+    --good:#1a7f4b; --bad:#b3261e; --warn:#9a6700; --card:#fff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme=light]) {
+      --bg:#16161a; --fg:#e8e8e4; --muted:#9a9a94; --line:#2c2c31;
+      --good:#4ade80; --bad:#f87171; --warn:#fbbf24; --card:#1d1d22;
+    }
+  }
+  * { box-sizing:border-box }
+  body { margin:0; padding:2.5rem 1.25rem 4rem; background:var(--bg); color:var(--fg);
+    font:16px/1.6 ui-sans-serif,-apple-system,Segoe UI,sans-serif; }
+  main { max-width:60rem; margin:0 auto }
+  h1 { font-size:1.5rem; margin:0 0 .25rem }
+  h2 { font-size:1.05rem; margin:2.5rem 0 .5rem; letter-spacing:.01em }
+  .sub { color:var(--muted); margin:0 0 2rem }
+  .verdict { font-size:1.6rem; font-weight:650; line-height:1.25;
+    padding:1.5rem; border-radius:.6rem; background:var(--card);
+    border:1px solid var(--line); border-left:4px solid currentColor; }
+  .verdict.good { color:var(--good) }
+  .verdict.bad  { color:var(--bad) }
+  .verdict.warn { color:var(--warn) }
+  .verdict small { display:block; font-size:.85rem; font-weight:400;
+    color:var(--muted); margin-top:.6rem }
+  .grid { display:grid; gap:.75rem; grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));
+    margin-top:1rem }
+  .stat { background:var(--card); border:1px solid var(--line); border-radius:.5rem;
+    padding:.9rem 1rem }
+  .stat b { display:block; font-size:1.35rem; font-variant-numeric:tabular-nums }
+  .stat span { color:var(--muted); font-size:.78rem; letter-spacing:.03em;
+    text-transform:uppercase }
+  table { width:100%; border-collapse:collapse; margin-top:.5rem; font-size:.9rem }
+  th,td { text-align:left; padding:.45rem .6rem; border-bottom:1px solid var(--line) }
+  th { color:var(--muted); font-weight:600; font-size:.75rem;
+    text-transform:uppercase; letter-spacing:.04em }
+  .num { text-align:right; font-variant-numeric:tabular-nums }
+  .mono { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.85em }
+  .good { color:var(--good) } .bad { color:var(--bad) }
+  .pill { font-size:.72rem; padding:.12rem .5rem; border-radius:1rem;
+    border:1px solid currentColor }
+  .pill.reconciled { color:var(--good) }
+  .pill.pending { color:var(--warn) }
+  .pill.broken { color:var(--bad) }
+  .note { color:var(--muted); font-size:.88rem; margin:.25rem 0 .75rem }
+  .wrap { overflow-x:auto }
+  footer { margin-top:3rem; padding-top:1rem; border-top:1px solid var(--line);
+    color:var(--muted); font-size:.82rem }
+</style>
+<main>
+  <h1>FactoryStream — completeness ledger</h1>
+  <p class=sub>Every 15-minute window, reconciled against generator ground truth.</p>
+
+  <div class="verdict good">
+    Every one of 523 windows reconciles exactly
+    <small>Ground truth is written directly to storage by the generator and never
+    travels the pipeline — so this is a comparison against known truth, not a
+    self-check.</small>
+  </div>
+
+  <div class=grid>
+    <div class=stat><b class=good>523</b><span>reconciled</span></div>
+    <div class=stat><b>0</b><span>pending</span></div>
+    <div class=stat><b class="">0</b><span>broken</span></div>
+    <div class=stat><b>8</b><span>machines</span></div>
+    <div class=stat><b>4,151</b><span>events in gold</span></div>
+  </div>
+
+  <h2>Disorder injected on purpose</h2>
+  <p class=note>The pipeline is fed deliberately corrupted, duplicated and late
+     data at declared rates. These are the numbers it had to survive.</p>
+  <div class=grid>
+    <div class=stat><b>4</b><span>corrupt → quarantined</span></div>
+    <div class=stat><b>92</b><span>duplicate copies</span></div>
+    <div class=stat><b>85</b><span>late arrivals</span></div>
+    <div class=stat><b>4,151</b><span>expected events</span></div>
+    <div class=stat><b>4,151</b><span>observed events</span></div>
+  </div>
+
+  <h2>By machine</h2>
+  <div class=wrap>
+  <table>
+    <tr><th>machine</th><th class=num>windows</th><th class=num>reconciled</th>
+        <th class=num>pending</th><th class=num>broken</th><th class=num>events</th></tr>
+    <tr><td class=mono>MW1-A-01</td><td class=num>62</td><td class='num good'>62</td><td class=num>0</td><td class='num '>0</td><td class=num>498</td></tr>
+<tr><td class=mono>MW1-A-02</td><td class=num>66</td><td class='num good'>66</td><td class=num>0</td><td class='num '>0</td><td class=num>533</td></tr>
+<tr><td class=mono>MW1-A-03</td><td class=num>66</td><td class='num good'>66</td><td class=num>0</td><td class='num '>0</td><td class=num>430</td></tr>
+<tr><td class=mono>MW1-A-04</td><td class=num>65</td><td class='num good'>65</td><td class=num>0</td><td class='num '>0</td><td class=num>741</td></tr>
+<tr><td class=mono>MW1-B-01</td><td class=num>68</td><td class='num good'>68</td><td class=num>0</td><td class='num '>0</td><td class=num>359</td></tr>
+<tr><td class=mono>MW1-B-02</td><td class=num>67</td><td class='num good'>67</td><td class=num>0</td><td class='num '>0</td><td class=num>362</td></tr>
+<tr><td class=mono>MW1-B-03</td><td class=num>65</td><td class='num good'>65</td><td class=num>0</td><td class='num '>0</td><td class=num>676</td></tr>
+<tr><td class=mono>MW1-B-04</td><td class=num>64</td><td class='num good'>64</td><td class=num>0</td><td class='num '>0</td><td class=num>552</td></tr>
+  </table>
+  </div>
+
+  <h2>Most recent windows</h2>
+  <div class=wrap>
+  <table>
+    <tr><th>window</th><th>machine</th><th>status</th><th class=num>events</th>
+        <th class=num>corrupt</th><th class=num>dup</th><th class=num>late</th></tr>
+    <tr><td class=mono>2026-03-02 23:00:00.000</td><td class=mono>MW1-A-01</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>3</td><td class=num>0</td><td class=num>0</td><td class=num>0</td></tr>
+<tr><td class=mono>2026-03-02 23:00:00.000</td><td class=mono>MW1-A-02</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>3</td><td class=num>0</td><td class=num>0</td><td class=num>0</td></tr>
+<tr><td class=mono>2026-03-02 23:00:00.000</td><td class=mono>MW1-A-03</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>2</td><td class=num>0</td><td class=num>0</td><td class=num>0</td></tr>
+<tr><td class=mono>2026-03-02 23:00:00.000</td><td class=mono>MW1-A-04</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>3</td><td class=num>0</td><td class=num>0</td><td class=num>0</td></tr>
+<tr><td class=mono>2026-03-02 23:00:00.000</td><td class=mono>MW1-B-01</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>3</td><td class=num>0</td><td class=num>0</td><td class=num>0</td></tr>
+<tr><td class=mono>2026-03-02 23:00:00.000</td><td class=mono>MW1-B-02</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>3</td><td class=num>0</td><td class=num>0</td><td class=num>0</td></tr>
+<tr><td class=mono>2026-03-02 23:00:00.000</td><td class=mono>MW1-B-03</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>3</td><td class=num>0</td><td class=num>0</td><td class=num>0</td></tr>
+<tr><td class=mono>2026-03-02 23:00:00.000</td><td class=mono>MW1-B-04</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>3</td><td class=num>0</td><td class=num>0</td><td class=num>0</td></tr>
+<tr><td class=mono>2026-03-02 22:45:00.000</td><td class=mono>MW1-A-01</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>9</td><td class=num>0</td><td class=num>0</td><td class=num>0</td></tr>
+<tr><td class=mono>2026-03-02 22:45:00.000</td><td class=mono>MW1-A-02</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>9</td><td class=num>0</td><td class=num>0</td><td class=num>0</td></tr>
+<tr><td class=mono>2026-03-02 22:45:00.000</td><td class=mono>MW1-A-03</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>7</td><td class=num>0</td><td class=num>0</td><td class=num>1</td></tr>
+<tr><td class=mono>2026-03-02 22:45:00.000</td><td class=mono>MW1-A-04</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>12</td><td class=num>0</td><td class=num>0</td><td class=num>0</td></tr>
+<tr><td class=mono>2026-03-02 22:45:00.000</td><td class=mono>MW1-B-01</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>6</td><td class=num>0</td><td class=num>1</td><td class=num>0</td></tr>
+<tr><td class=mono>2026-03-02 22:45:00.000</td><td class=mono>MW1-B-02</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>6</td><td class=num>0</td><td class=num>0</td><td class=num>0</td></tr>
+<tr><td class=mono>2026-03-02 22:45:00.000</td><td class=mono>MW1-B-03</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>14</td><td class=num>0</td><td class=num>0</td><td class=num>0</td></tr>
+<tr><td class=mono>2026-03-02 22:45:00.000</td><td class=mono>MW1-B-04</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>10</td><td class=num>0</td><td class=num>0</td><td class=num>0</td></tr>
+<tr><td class=mono>2026-03-02 22:30:00.000</td><td class=mono>MW1-A-01</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>10</td><td class=num>0</td><td class=num>0</td><td class=num>0</td></tr>
+<tr><td class=mono>2026-03-02 22:30:00.000</td><td class=mono>MW1-A-02</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>9</td><td class=num>0</td><td class=num>3</td><td class=num>0</td></tr>
+<tr><td class=mono>2026-03-02 22:30:00.000</td><td class=mono>MW1-A-03</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>7</td><td class=num>0</td><td class=num>1</td><td class=num>0</td></tr>
+<tr><td class=mono>2026-03-02 22:30:00.000</td><td class=mono>MW1-A-04</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>14</td><td class=num>0</td><td class=num>0</td><td class=num>0</td></tr>
+<tr><td class=mono>2026-03-02 22:30:00.000</td><td class=mono>MW1-B-01</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>5</td><td class=num>0</td><td class=num>0</td><td class=num>0</td></tr>
+<tr><td class=mono>2026-03-02 22:30:00.000</td><td class=mono>MW1-B-02</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>6</td><td class=num>0</td><td class=num>0</td><td class=num>0</td></tr>
+<tr><td class=mono>2026-03-02 22:30:00.000</td><td class=mono>MW1-B-03</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>11</td><td class=num>0</td><td class=num>0</td><td class=num>0</td></tr>
+<tr><td class=mono>2026-03-02 22:30:00.000</td><td class=mono>MW1-B-04</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>9</td><td class=num>0</td><td class=num>0</td><td class=num>0</td></tr>
+<tr><td class=mono>2026-03-02 22:15:00.000</td><td class=mono>MW1-A-01</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>9</td><td class=num>0</td><td class=num>0</td><td class=num>1</td></tr>
+<tr><td class=mono>2026-03-02 22:15:00.000</td><td class=mono>MW1-A-02</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>9</td><td class=num>0</td><td class=num>0</td><td class=num>0</td></tr>
+<tr><td class=mono>2026-03-02 22:15:00.000</td><td class=mono>MW1-A-03</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>7</td><td class=num>0</td><td class=num>0</td><td class=num>0</td></tr>
+<tr><td class=mono>2026-03-02 22:15:00.000</td><td class=mono>MW1-A-04</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>13</td><td class=num>0</td><td class=num>0</td><td class=num>0</td></tr>
+<tr><td class=mono>2026-03-02 22:15:00.000</td><td class=mono>MW1-B-01</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>6</td><td class=num>0</td><td class=num>0</td><td class=num>0</td></tr>
+<tr><td class=mono>2026-03-02 22:15:00.000</td><td class=mono>MW1-B-02</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>5</td><td class=num>0</td><td class=num>0</td><td class=num>0</td></tr>
+<tr><td class=mono>2026-03-02 22:15:00.000</td><td class=mono>MW1-B-03</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>11</td><td class=num>0</td><td class=num>1</td><td class=num>1</td></tr>
+<tr><td class=mono>2026-03-02 22:15:00.000</td><td class=mono>MW1-B-04</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>9</td><td class=num>0</td><td class=num>0</td><td class=num>0</td></tr>
+<tr><td class=mono>2026-03-02 22:00:00.000</td><td class=mono>MW1-A-02</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>9</td><td class=num>0</td><td class=num>0</td><td class=num>1</td></tr>
+<tr><td class=mono>2026-03-02 22:00:00.000</td><td class=mono>MW1-A-03</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>7</td><td class=num>0</td><td class=num>0</td><td class=num>0</td></tr>
+<tr><td class=mono>2026-03-02 22:00:00.000</td><td class=mono>MW1-A-04</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>14</td><td class=num>0</td><td class=num>0</td><td class=num>1</td></tr>
+<tr><td class=mono>2026-03-02 22:00:00.000</td><td class=mono>MW1-B-01</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>6</td><td class=num>0</td><td class=num>0</td><td class=num>0</td></tr>
+<tr><td class=mono>2026-03-02 22:00:00.000</td><td class=mono>MW1-B-02</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>6</td><td class=num>0</td><td class=num>0</td><td class=num>0</td></tr>
+<tr><td class=mono>2026-03-02 22:00:00.000</td><td class=mono>MW1-B-03</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>11</td><td class=num>0</td><td class=num>0</td><td class=num>1</td></tr>
+<tr><td class=mono>2026-03-02 22:00:00.000</td><td class=mono>MW1-B-04</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>9</td><td class=num>0</td><td class=num>0</td><td class=num>0</td></tr>
+<tr><td class=mono>2026-03-02 21:45:00.000</td><td class=mono>MW1-A-02</td><td><span class='pill reconciled'>reconciled</span></td><td class=num>8</td><td class=num>0</td><td class=num>0</td><td class=num>1</td></tr>
+  </table>
+  </div>
+
+  <footer>
+    Generated 2026-08-20 00:15:37 UTC ·
+    window range 2026-03-02 05:45:00.000 → 2026-03-02 23:00:00.000 ·
+    every event synthetic, from a seeded generator. The plant is fictional.
+  </footer>
+</main>

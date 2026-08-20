@@ -1,0 +1,87 @@
+# Redpanda, single node. The duty-cycle stack.
+#
+# Kafka API compatible, so `confluent-kafka` talks to it unchanged and every
+# semantic the project cares about — partitions, consumer groups, offset
+# commits, replay from an offset — behaves as it would against Kafka. The
+# transferable asset is the API and its semantics, not the broker.
+#
+# Chosen over Apache Kafka on operational footprint: no ZooKeeper, no KRaft
+# ceremony, one container. Chosen over MSK/Confluent/Kinesis on cost — managed
+# streams bill by the hour and teach a narrower API (decisions entry 1).
+#
+# Single node is honest about scale. Replication factor 1 means a broker loss
+# loses data, which is fine for a duty-cycled synthetic generator and would not
+# be fine for anything real. Stated rather than hidden.
+
+services:
+  redpanda:
+    image: redpandadata/redpanda:v24.2.7
+    container_name: factorystream-redpanda
+    command:
+      - redpanda
+      - start
+      - --smp=1
+      - --memory=1G
+      - --overprovisioned
+      - --node-id=0
+      - --check=false
+      # Two listeners: `internal` for containers on this network, `external`
+      # for the host. Without the split, a client on the host resolves the
+      # advertised address as a container name and cannot connect — the single
+      # most common Kafka-in-Docker failure.
+      - --kafka-addr=internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr=internal://redpanda:9092,external://localhost:19092
+      - --rpc-addr=redpanda:33145
+      - --advertise-rpc-addr=redpanda:33145
+    ports:
+      - "19092:19092"   # Kafka API, from the host
+      - "9644:9644"     # admin API — used by the healthcheck and for lag metrics
+    volumes:
+      - redpanda-data:/var/lib/redpanda/data
+    healthcheck:
+      # `cluster health` rather than a port check: the port opens well before
+      # the cluster will accept a produce, and a consumer that connects too
+      # early fails in a confusing way.
+      test: ["CMD-SHELL", "rpk cluster health -X admin.hosts=localhost:9644 | grep -q 'Healthy:.*true'"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  # Creates the topic with the partition count the project assumes, then exits.
+  # Auto-creation would give a single partition and silently invalidate every
+  # claim about per-key ordering across partitions.
+  topic-init:
+    image: redpandadata/redpanda:v24.2.7
+    container_name: factorystream-topic-init
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        rpk topic create factory.events \
+          --brokers redpanda:9092 \
+          --partitions 6 \
+          --replicas 1 \
+          || echo "topic already exists"
+        rpk topic describe factory.events --brokers redpanda:9092
+    restart: "no"
+
+  # Optional web console. Not required by anything; useful for showing partition
+  # assignment and consumer lag in the demo GIF.
+  console:
+    image: redpandadata/console:v2.7.2
+    container_name: factorystream-console
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_BROKERS: redpanda:9092
+    profiles:
+      - ui
+
+volumes:
+  redpanda-data:

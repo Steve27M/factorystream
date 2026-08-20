@@ -1,0 +1,42 @@
+version: 2
+
+models:
+  - name: slv_events
+    description: >
+      Conformed and deduplicated events, keyed to their 15-minute event-time
+      window. One row per distinct event_id.
+    columns:
+      - name: event_id
+        description: Unique after dedupe. This test IS the dedupe proof.
+        data_tests:
+          - unique
+          - not_null
+      - name: machine_id
+        data_tests:
+          - not_null
+      - name: event_type
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['cycle', 'defect', 'state_change', 'operator_scan']
+      - name: schema_version
+        description: 1 or 2; the drift cutover. Both must survive into silver.
+        data_tests:
+          # quote: false because the column is an integer — accepted_values
+          # quotes its values by default, which compares int against varchar
+          # and fails on a type mismatch rather than on the data.
+          - accepted_values:
+              arguments:
+                values: [1, 2]
+                quote: false
+      - name: event_time
+        data_tests:
+          - not_null
+      - name: window_start
+        data_tests:
+          - not_null
+      - name: operator_badge
+        description: >
+          Unified across the v1/v2 rename. Present on cycle and scan events;
+          null on state changes, which have no operator.

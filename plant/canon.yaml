@@ -1,0 +1,192 @@
+# The Plant Canon — Meridian Works, Line A & Line B
+#
+# One fictional factory, simulated two ways. FactoryStream generates its
+# shop-floor event stream; WearWatch simulates the same machines' physics and
+# exposes them over OPC UA. Both read this file, so the two projects
+# demonstrably model the same plant rather than two unrelated inventions.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# EVERY VALUE HERE IS INVENTED.
+#
+# No employer schema, machine name, cycle time, defect rate, or process detail
+# informs this file. The plant does not exist. Machine models are fictional
+# ("Kestrel VMC-40"), the products are fictional, and the rates were chosen to
+# be plausible-looking and to exercise the pipeline — not to describe anything
+# real. This is a binding non-goal in both projects' specs, and it is a hard
+# boundary rather than a sanitisation task.
+#
+# Where a number needed to look credible, it came from published general
+# manufacturing references, not from anywhere the author has worked.
+# ─────────────────────────────────────────────────────────────────────────────
+
+canon_version: 1
+
+plant:
+  id: MW1
+  name: Meridian Works
+  # ISA-95 style hierarchy: Enterprise / Site / Area / WorkCenter / WorkUnit.
+  # WearWatch mirrors this in its OPC UA address space.
+  enterprise: Meridian Industrial
+  site: Meridian Works
+  timezone: America/New_York
+
+# --- Shift calendar ----------------------------------------------------------
+# Two shifts with breaks. Drives both the event generator's activity curve and
+# the physics simulator's duty cycle. Times are local to plant.timezone.
+shifts:
+  - id: A
+    label: Day
+    start: "06:00"
+    end: "14:30"
+    breaks:
+      - { start: "09:00", minutes: 15 }
+      - { start: "11:30", minutes: 30 }
+  - id: B
+    label: Swing
+    start: "14:30"
+    end: "23:00"
+    breaks:
+      - { start: "17:00", minutes: 15 }
+      - { start: "19:30", minutes: 30 }
+# Third shift is unstaffed. Machines idle; a quiet window is useful — it proves
+# downstream aggregation handles empty windows rather than skipping them.
+
+areas:
+  - id: MACH
+    name: Machining
+    lines: [A, B]
+
+lines:
+  - id: A
+    name: Line A — Housings
+    area: MACH
+    machines: [MW1-A-01, MW1-A-02, MW1-A-03, MW1-A-04]
+  - id: B
+    name: Line B — Manifolds
+    area: MACH
+    machines: [MW1-B-01, MW1-B-02, MW1-B-03, MW1-B-04]
+
+# --- Machines ----------------------------------------------------------------
+# `nominal_cycle_s` is the ideal per-unit cycle; generators add variance.
+# `wear_sensitivity` scales WearWatch's tool-wear accrual — it is ignored by
+# FactoryStream, which has no physics layer. Kept here anyway so the canon
+# stays one file rather than two that drift apart.
+machines:
+  - id: MW1-A-01
+    line: A
+    model: Kestrel VMC-40
+    kind: vertical_machining_center
+    nominal_cycle_s: 92
+    wear_sensitivity: 1.00
+    installed: 2021-03-15
+  - id: MW1-A-02
+    line: A
+    model: Kestrel VMC-40
+    kind: vertical_machining_center
+    nominal_cycle_s: 92
+    wear_sensitivity: 1.15   # oldest spindle on the line; degrades faster
+    installed: 2019-08-02
+  - id: MW1-A-03
+    line: A
+    model: Kestrel VMC-60
+    kind: vertical_machining_center
+    nominal_cycle_s: 118
+    wear_sensitivity: 0.90
+    installed: 2023-01-20
+  - id: MW1-A-04
+    line: A
+    model: Harrier HTC-25
+    kind: turning_center
+    nominal_cycle_s: 64
+    wear_sensitivity: 1.05
+    installed: 2022-06-11
+  - id: MW1-B-01
+    line: B
+    model: Kestrel VMC-60
+    kind: vertical_machining_center
+    nominal_cycle_s: 145
+    wear_sensitivity: 1.00
+    installed: 2022-11-04
+  - id: MW1-B-02
+    line: B
+    model: Kestrel VMC-60
+    kind: vertical_machining_center
+    nominal_cycle_s: 145
+    wear_sensitivity: 1.30   # known problem machine; the interesting one
+    installed: 2018-05-29
+  - id: MW1-B-03
+    line: B
+    model: Harrier HTC-25
+    kind: turning_center
+    nominal_cycle_s: 71
+    wear_sensitivity: 0.95
+    installed: 2023-09-14
+  - id: MW1-B-04
+    line: B
+    model: Harrier HTC-40
+    kind: turning_center
+    nominal_cycle_s: 88
+    wear_sensitivity: 1.10
+    installed: 2020-02-17
+
+# --- Products ----------------------------------------------------------------
+# Line A runs housings, Line B runs manifolds. `defect_base_rate` is the
+# baseline scrap fraction before machine condition modifies it.
+products:
+  - sku: HSG-114
+    name: Pump housing, 114 mm
+    line: A
+    defect_base_rate: 0.021
+  - sku: HSG-160
+    name: Pump housing, 160 mm
+    line: A
+    defect_base_rate: 0.028
+  - sku: MAN-4W
+    name: Manifold, 4-way
+    line: B
+    defect_base_rate: 0.017
+  - sku: MAN-6W
+    name: Manifold, 6-way
+    line: B
+    defect_base_rate: 0.034   # tightest tolerance part in the plant
+
+# --- Work orders -------------------------------------------------------------
+# Shapes, not instances. Generators draw order sizes from this range and assign
+# them to a machine that runs the product's line.
+work_orders:
+  units_min: 40
+  units_max: 400
+  changeover_minutes: { min: 12, max: 45 }
+  # Fraction of orders that get split across two machines on the same line.
+  split_probability: 0.15
+
+# --- Defect taxonomy ---------------------------------------------------------
+# Shared vocabulary. FactoryStream emits these as defect events; WearWatch's
+# physics can bias toward wear-correlated codes as tools degrade.
+defect_codes:
+  - { code: DIM-OOT,  label: Dimension out of tolerance, wear_correlated: true }
+  - { code: SURF-FIN, label: Surface finish,             wear_correlated: true }
+  - { code: BURR,     label: Burr / deburr required,     wear_correlated: true }
+  - { code: MAT-INCL, label: Material inclusion,         wear_correlated: false }
+  - { code: SETUP,    label: Setup error,                wear_correlated: false }
+  - { code: HANDLING, label: Handling damage,            wear_correlated: false }
+
+# --- Machine states ----------------------------------------------------------
+# PackML-inspired subset (ISA-TR88). WearWatch exposes these as an OPC UA enum;
+# FactoryStream emits transitions as state-change events. Verify the full state
+# model against the published standard before claiming PackML conformance —
+# this is a working subset, not the complete state machine.
+states:
+  - { id: 0, name: IDLE }
+  - { id: 1, name: EXECUTE }
+  - { id: 2, name: HELD }
+  - { id: 3, name: SUSPENDED }
+  - { id: 4, name: ABORTED }
+  - { id: 5, name: CHANGEOVER }
+
+# --- Operators ---------------------------------------------------------------
+# Badge IDs only, deliberately. No names, no personal attributes: even in a
+# fictional plant there is no reason to invent people, and a scan event needs
+# nothing more than an opaque identifier.
+operators:
+  badge_ids: [OP-1042, OP-1108, OP-1177, OP-1203, OP-1250, OP-1319]

@@ -1,0 +1,46 @@
+version: 2
+
+sources:
+  - name: lake
+    database: awsdatacatalog
+    schema: factorystream
+    description: >
+      Glue-catalogued lake. Tables are declared in Terraform with explicit DDL
+      rather than discovered by a crawler — crawlers drift and mutate a schema
+      under a running build, and a declared schema is a reviewable contract.
+
+    tables:
+      - name: bronze_events
+        description: >
+          Raw events exactly as landed by the consumer. Partitioned on INGEST
+          time, not event time, so late arrivals never reopen a closed
+          partition. Contains the duplicate copies the injector published on
+          purpose; deduplication is silver's job.
+        columns:
+          - name: event_id
+            description: The dedupe key. Duplicated on purpose at a declared rate.
+          - name: payload
+            description: Raw JSON. Shape varies by event_type AND schema_version.
+          - name: kafka_offset
+            description: Provenance for replay.
+
+      - name: quarantine
+        description: >
+          Payloads the consumer could not parse, with offset provenance.
+          Queryable, never dropped — the ledger asserts this count exactly
+          against the number of corrupt payloads injected.
+
+      - name: manifests
+        description: >
+          Ground truth, written directly by the generator. **Never travels the
+          pipeline** — it is what the pipeline is judged against, and truth that
+          travelled the path it validates is a tautology rather than evidence.
+        columns:
+          - name: event_id_checksum
+            description: >
+              Catches a loss plus a phantom netting to zero, which counts alone
+              cannot.
+          - name: corrupt_count
+            description: Injected corruptions in this window; expected missing from bronze.
+          - name: duplicate_extra_count
+            description: Extra copies published; expected present in bronze, absent after dedupe.

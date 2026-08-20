@@ -1,0 +1,33 @@
+# Committed deliberately: there are no secrets here.
+#
+# Authentication is the ambient AWS credential chain — a local IAM profile for
+# development, an OIDC-assumed role in CI. No key appears in this file, and no
+# key appears anywhere in this repository.
+#
+# Bucket names come from the environment rather than being hardcoded. They are
+# not secret (an AWS account id appears in every ARN anyone shares), but a
+# literal here would tie the repo to one account and make it unclonable.
+#
+#   FS_LAKE_BUCKET     — the lake, e.g. factorystream-lake-<account-id>
+#   FS_ATHENA_RESULTS  — Athena query scratch, from the account Terraform module
+#
+# Both are `terraform output` values; see docs/runbooks.md.
+factorystream:
+  target: dev
+  outputs:
+    dev:
+      type: athena
+      s3_staging_dir: "s3://{{ env_var('FS_ATHENA_RESULTS') }}/results/"
+      region_name: "{{ env_var('AWS_REGION', 'us-east-1') }}"
+      database: awsdatacatalog
+      schema: factorystream
+      # The shared workgroup carries the 2 GiB per-query scan cap. Pointing dbt
+      # at the default workgroup would silently escape that guardrail.
+      work_group: plant-platform
+      threads: 4
+      table_type: hive
+      # Materialised tables must NOT live under the staging dir — that prefix
+      # carries a 7-day expiry, because query results are scratch. See
+      # docs/decisions.md 23 for the hour this cost.
+      s3_data_dir: "s3://{{ env_var('FS_LAKE_BUCKET') }}/warehouse/"
+      s3_data_naming: schema_table
