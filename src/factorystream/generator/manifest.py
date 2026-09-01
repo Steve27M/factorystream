@@ -30,7 +30,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 
-from factorystream.generator.events import Event, EventType
+from factorystream.generator.events import Event, EventType, cycle_duration_seconds
 
 
 class InjectionCounts(Protocol):
@@ -158,9 +158,9 @@ def build_manifest(
             case EventType.CYCLE:
                 manifest.cycle_count += 1
                 manifest.unit_count += 1
-                duration = event.payload.get("duration_s")
-                if isinstance(duration, int | float):
-                    manifest.cycle_duration_sum_s += float(duration)
+                duration = cycle_duration_seconds(event.payload)
+                if duration is not None:
+                    manifest.cycle_duration_sum_s += duration
             case EventType.DEFECT:
                 manifest.defect_count += 1
             case EventType.STATE_CHANGE:
@@ -186,9 +186,9 @@ def build_manifest(
                 # Attribute to the measures this event would have contributed to.
                 if event.event_type is EventType.CYCLE:
                     manifest.corrupt_cycle_count += 1
-                    duration = event.payload.get("duration_s")
-                    if isinstance(duration, int | float):
-                        manifest.corrupt_duration_sum_s += float(duration)
+                    duration = cycle_duration_seconds(event.payload)
+                    if duration is not None:
+                        manifest.corrupt_duration_sum_s += duration
                 elif event.event_type is EventType.DEFECT:
                     manifest.corrupt_defect_count += 1
             if event.event_id in injections.late_event_ids:

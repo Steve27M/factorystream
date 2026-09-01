@@ -67,7 +67,7 @@ jobs:
         # needs it and mypy already overrides it.
         run: |
           uv venv
-          uv pip install -e ".[dev,stream,contracts]"
+          uv pip install -e ".[dev,stream,contracts,warehouse]"
 
       - name: Lint
         run: uv run ruff check src tests tools
@@ -96,6 +96,43 @@ jobs:
         # of the three integration tests skip without this file, and the first
         # CI run proved the guard below catches that rather than passing.
         run: uv run python -m factorystream.consumer.producer --events out/events.jsonl
+
+      - name: Build the warehouse on DuckDB
+        # The Athena target needs credentials a runner does not have, so for a
+        # long time dbt could not run in CI at all and the entire warehouse
+        # layer went unexercised on every push. DuckDB reads the same parquet
+        # the consumer wrote - not a fixture - so this executes the real model
+        # set against real objects.
+        #
+        # `build`, not `run`: the 25 data tests are the point, including the
+        # accepted_values list that caught an undeclared schema version.
+        run: |
+          uv run python -m factorystream.consumer.load --root out/lake
+          cd transform
+          uv run dbt deps
+          uv run dbt build --target duckdb --profiles-dir .
+
+      - name: Reconciliation still closes
+        # The headline claim, asserted rather than admired. 523 of 523 windows
+        # must reconcile, and a `broken` window fails the build.
+        run: |
+          uv run python - <<'PY'
+          import duckdb, sys
+          con = duckdb.connect("out/warehouse.duckdb", read_only=True)
+          total, broken, pending = con.execute(
+              "select count(*), "
+              "sum(case when status='broken' then 1 else 0 end), "
+              "sum(case when status='pending' then 1 else 0 end) "
+              "from completeness_ledger"
+          ).fetchone()
+          print(f"windows {total}  broken {broken}  pending {pending}")
+          if broken:
+              print(f"::error::{broken} of {total} windows do not reconcile")
+              sys.exit(1)
+          if total == 0:
+              print("::error::the ledger is empty - nothing was graded")
+              sys.exit(1)
+          PY
 
       - name: Live broker
         # A skip here means the broker never came up or the events were never

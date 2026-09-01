@@ -38,7 +38,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from factorystream.generator.events import SCHEMA_V2, Event, to_v2
+from factorystream.generator.events import SCHEMA_V2, SCHEMA_V3, Event, to_v2, to_v3
 
 
 class DisorderConfig(BaseModel):
@@ -61,6 +61,17 @@ class DisorderConfig(BaseModel):
 
     # A single cutover: every event after this fraction of the run uses v2.
     schema_drift_at: float | None = Field(default=0.5, ge=0, le=1)
+    # A SECOND cutover, later in the run, to v3 (`duration_s` -> `duration_ms`).
+    #
+    # Off by default, and that is a deliberate compromise rather than an
+    # oversight. Turning it on changes the published stream, which changes the
+    # manifest, which changes every number in the reconciliation evidence and
+    # in the README. Those numbers are dated and cited; silently moving them to
+    # demonstrate a feature would be the least honest thing in the repository.
+    #
+    # So v3 is exercised by `tests/test_contracts_end_to_end.py`, which builds
+    # its own lake, and the documented run stays reproducible.
+    schema_v3_at: float | None = Field(default=None, ge=0, le=1)
 
     corrupt_rate: float = Field(default=0.001, ge=0, le=1)
 
@@ -74,6 +85,7 @@ class InjectionLog:
     out_of_order_event_ids: set[str] = field(default_factory=set)
     skewed_machines: dict[str, float] = field(default_factory=dict)
     schema_v2_event_ids: set[str] = field(default_factory=set)
+    schema_v3_event_ids: set[str] = field(default_factory=set)
     corrupt_event_ids: set[str] = field(default_factory=set)
 
     def summary(self) -> dict[str, Any]:
@@ -86,6 +98,7 @@ class InjectionLog:
             "out_of_order": len(self.out_of_order_event_ids),
             "skewed_machines": dict(self.skewed_machines),
             "schema_v2": len(self.schema_v2_event_ids),
+            "schema_v3": len(self.schema_v3_event_ids),
             "corrupt": len(self.corrupt_event_ids),
         }
 
@@ -219,6 +232,16 @@ def _apply_schema_drift(
         event.schema_version = SCHEMA_V2
         event.payload = to_v2(event.payload, event.event_type)
         log.schema_v2_event_ids.add(event.event_id)
+
+    # The v3 cutover, if enabled, lands inside the v2 tail: a deployment
+    # supersedes the one before it rather than branching from the original.
+    if config.schema_v3_at is not None:
+        cut3 = int(len(ordered) * config.schema_v3_at)
+        for event in ordered[cut3:]:
+            event.schema_version = SCHEMA_V3
+            event.payload = to_v3(event.payload, event.event_type)
+            log.schema_v3_event_ids.add(event.event_id)
+
     return events
 
 

@@ -21,14 +21,22 @@ models:
               arguments:
                 values: ['cycle', 'defect', 'state_change', 'operator_scan']
       - name: schema_version
-        description: 1 or 2; the drift cutover. Both must survive into silver.
+        description: >
+          1, 2 or 3 — the two drift cutovers. All three must survive into
+          silver, conformed to one shape. v3 is off in the published scenario
+          and exercised by tests/test_contracts_end_to_end.py.
         data_tests:
           # quote: false because the column is an integer — accepted_values
           # quotes its values by default, which compares int against varchar
           # and fails on a type mismatch rather than on the data.
+          #
+          # 3 was added only after this test failed on a real v3 run. It is
+          # worth noting that the test worked exactly as intended: a new
+          # schema version appearing in silver without anyone declaring it is
+          # precisely what an accepted_values list is for.
           - accepted_values:
               arguments:
-                values: [1, 2]
+                values: [1, 2, 3]
                 quote: false
       - name: event_time
         data_tests:

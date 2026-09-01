@@ -57,6 +57,10 @@ replay:  ## Re-land bronze from offset 0. Idempotent naming makes this safe.
 load:  ## Bootstrap path: generator -> bronze, bypassing the broker.
 	python -m factorystream.consumer.load --root $(ROOT)
 
+build-duckdb:  ## Build + test the whole model set locally. No AWS needed.
+	python -m factorystream.consumer.load --root out/lake
+	cd transform && dbt deps && dbt build --target duckdb --profiles-dir .
+
 test-integration:  ## The kill-test. Needs a running broker. Proves no loss, no duplicates.
 	pytest -q -m integration
 

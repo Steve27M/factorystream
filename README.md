@@ -9,8 +9,8 @@ schema-drifting events, **on purpose, at declared rates**) → a Kafka-API broke
 → Glue + Athena → dbt into a Kimball star → **exact reconciliation against a per-window
 manifest**. All AWS resources are Terraform; nothing is created by console.
 
-> **Status:** Phases 0–4 and 6 complete. 96 tests, **523 of 523 windows reconciling
-> exactly**, and a versioned event contract gated at the producer. Phase 5's
+> **Status:** Phases 0–4 and 6 complete. 100 tests, **523 of 523 windows reconciling
+> exactly on two engines**, and a versioned event contract gated at the producer. Phase 5's
 > destroy/rebuild acceptance run is deliberately deferred — the account module holds
 > guardrails a sibling project is currently relying on ([`docs/stages/5.md`](docs/stages/5.md)).
 > Each phase is dated in [`docs/stages/`](docs/stages); the spec is
@@ -137,7 +137,8 @@ python tools/teardown_verify.py --all-regions
 
 ```bash
 make help                  # the entry points
-pytest                     # 96 tests
+make build-duckdb          # the whole model set + 25 data tests, no AWS needed
+pytest                     # 100 tests
 pytest -m integration      # needs the broker (make broker)
 ```
 

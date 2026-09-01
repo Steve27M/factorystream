@@ -28,6 +28,7 @@ from pydantic import BaseModel, Field
 
 SCHEMA_V1 = 1
 SCHEMA_V2 = 2
+SCHEMA_V3 = 3
 
 
 class EventType(StrEnum):
@@ -133,4 +134,55 @@ def to_v2(payload: dict[str, Any], event_type: EventType) -> dict[str, Any]:
     out["line_id"] = out.get("line_id", "")
     if event_type is EventType.CYCLE and "operator" in out:
         out["operator_badge"] = out.pop("operator")
+    return out
+
+
+def cycle_duration_seconds(payload: dict[str, Any]) -> float | None:
+    """The cycle duration in SECONDS, whatever version the payload is.
+
+    One function, because the alternative is every reader knowing the contract's
+    history - and the first reader that did not know it was the manifest writer,
+    which summed `payload["duration_s"]` unconditionally. Under v3 that key does
+    not exist, so ground truth silently recorded **zero** for every v3 cycle.
+
+    The failure mode is the one worth noticing: nothing raised, no count was
+    wrong, and the completeness ledger reported 129 windows `broken` with an
+    `event_delta` of exactly 0 - the pipeline was correct and the thing grading
+    it was not. Only a full v3 run through the warehouse could show that, which
+    is why `tests/test_contracts_end_to_end.py` exists.
+
+    Seconds is the canonical unit here because the manifest, silver and gold all
+    speak it; v3 is the outlier and is converted at every boundary that reads it.
+    """
+    seconds = payload.get("duration_s")
+    if isinstance(seconds, int | float):
+        return float(seconds)
+    millis = payload.get("duration_ms")
+    if isinstance(millis, int | float):
+        return float(millis) / 1000.0
+    return None
+
+
+def to_v3(payload: dict[str, Any], event_type: EventType) -> dict[str, Any]:
+    """Apply the v3 schema change: `duration_s` becomes `duration_ms`.
+
+    A **unit change**, chosen deliberately as the awkward case.
+
+    The registry catches this one, because the field is also renamed - a
+    removal plus an addition, breaking both directions. What it could not catch
+    is the sibling change that keeps the name `duration_s` and puts
+    milliseconds in it: same name, same type, still a positive number, and
+    every downstream aggregate wrong by a factor of a thousand. JSON Schema
+    describes shape; a unit is meaning. See `contracts.registry.SEMANTIC_CHANGES`.
+
+    So the rename here is not cosmetic. It is the thing that makes the change
+    *visible* to a mechanical check, and doing it the other way is the mistake
+    the chapter exists to point at.
+
+    Integer milliseconds, not float: the whole point of the move is that the
+    new unit does not need a fractional part.
+    """
+    out = to_v2(payload, event_type)
+    if event_type is EventType.CYCLE and "duration_s" in out:
+        out["duration_ms"] = int(round(float(out.pop("duration_s")) * 1000))
     return out

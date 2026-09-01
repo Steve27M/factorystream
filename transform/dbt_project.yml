@@ -35,7 +35,14 @@ models:
     # env_var, not a literal: a hardcoded bucket name makes the repo work for
     # exactly one AWS account, and a portfolio repo someone cannot clone and
     # run is a screenshot with extra steps.
-    +s3_data_dir: "s3://{{ env_var('FS_LAKE_BUCKET') }}/warehouse/"
+    # Athena-only, but it must still PARSE under DuckDB. `env_var` is evaluated
+    # at parse time, so an unguarded reference makes every DuckDB run fail
+    # before it starts, on a variable that target has no use for. A `{% if %}`
+    # block does not work here either - this file is scanned as YAML before any
+    # Jinja control flow runs, and the block breaks the scanner outright.
+    #
+    # So: a default. DuckDB parses it, ignores it, and never touches S3.
+    +s3_data_dir: "s3://{{ env_var('FS_LAKE_BUCKET', 'athena-target-only') }}/warehouse/"
     +s3_data_naming: schema_table
     staging:
       # Views: staging is thin parsing over bronze, and materialising it would

@@ -39,6 +39,12 @@ cloud = [
     "boto3>=1.34.0",
     "dbt-athena-community>=1.8.0",
 ]
+warehouse = [
+    # The second dbt target. Reads the same parquet the consumer wrote, so the
+    # model set can be executed - and therefore checked - without AWS.
+    "dbt-duckdb>=1.8",
+    "duckdb>=1.0",
+]
 
 [project.scripts]
 factorystream-generate = "factorystream.generator.cli:main"

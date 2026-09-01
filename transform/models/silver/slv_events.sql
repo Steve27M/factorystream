@@ -58,7 +58,7 @@ select
     -- clock skew — the manifest records what the machine reported, so grading
     -- against a corrected time the pipeline never saw would fail it for the
     -- generator's fiction.
-    from_unixtime(floor(to_unixtime(event_time) / 900) * 900) as window_start,
+    {{ window_start("event_time") }} as window_start,
 
     -- Flagged, not filtered. A late arrival is real data that needs
     -- re-statement, and dropping it would be the silent-loss failure this

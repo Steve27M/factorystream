@@ -2,8 +2,13 @@ version: 2
 
 sources:
   - name: lake
-    database: awsdatacatalog
-    schema: factorystream
+    # Athena resolves these through Glue. DuckDB has no catalog, so it is
+    # pointed at the same objects on disk via `external_location` - the parquet
+    # the consumer actually wrote, not a fixture. `{name}` interpolates the
+    # table name below, and the directory for `bronze_events` is `bronze`, so
+    # each table states its own path rather than relying on the convention.
+    database: "{{ 'awsdatacatalog' if target.type == 'athena' else target.database }}"
+    schema: "{{ 'factorystream' if target.type == 'athena' else target.schema }}"
     description: >
       Glue-catalogued lake. Tables are declared in Terraform with explicit DDL
       rather than discovered by a crawler — crawlers drift and mutate a schema
@@ -11,6 +16,8 @@ sources:
 
     tables:
       - name: bronze_events
+        meta:
+          external_location: "read_parquet('{{ env_var('FS_LAKE_DIR', '../out/lake') }}/bronze/**/*.parquet', hive_partitioning=1, union_by_name=1)"
         description: >
           Raw events exactly as landed by the consumer. Partitioned on INGEST
           time, not event time, so late arrivals never reopen a closed
@@ -25,12 +32,16 @@ sources:
             description: Provenance for replay.
 
       - name: quarantine
+        meta:
+          external_location: "read_parquet('{{ env_var('FS_LAKE_DIR', '../out/lake') }}/quarantine/**/*.parquet', hive_partitioning=1, union_by_name=1)"
         description: >
           Payloads the consumer could not parse, with offset provenance.
           Queryable, never dropped — the ledger asserts this count exactly
           against the number of corrupt payloads injected.
 
       - name: manifests
+        meta:
+          external_location: "read_parquet('{{ env_var('FS_LAKE_DIR', '../out/lake') }}/manifests/**/*.parquet', hive_partitioning=1, union_by_name=1)"
         description: >
           Ground truth, written directly by the generator. **Never travels the
           pipeline** — it is what the pipeline is judged against, and truth that
