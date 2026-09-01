@@ -78,13 +78,23 @@ jobs:
       - name: Unit tests
         run: uv run pytest -q
 
+      - name: Generate a shift and publish it
+        # The kill-test replays `out/events.jsonl` and compares what landed
+        # against what was produced, so it needs real events on the topic. Two
+        # of the three integration tests skip without this file, and the first
+        # CI run proved the guard below catches that rather than passing.
+        run: |
+          uv run python -m factorystream.generator.cli --config plant/scenario.yaml --out out/
+          uv run python -m factorystream.consumer.producer --events out/events.jsonl
+
       - name: Live broker
-        # A skip here means the broker did not come up, which must fail the
-        # build rather than pass quietly.
+        # A skip here means the broker never came up or the events were never
+        # produced. Either way the kill-test did not run, and a skipped
+        # integration test in CI looks exactly like a passing one.
         run: |
           uv run pytest -q -m integration -rs | tee result.txt
           if grep -qE "[0-9]+ skipped" result.txt; then
-            echo "::error::integration tests were skipped - the broker did not start"
+            echo "::error::integration tests were skipped - no broker, or no events on the topic"
             exit 1
           fi
 

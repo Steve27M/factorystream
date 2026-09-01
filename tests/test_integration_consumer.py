@@ -26,6 +26,7 @@ import glob
 import json
 import os
 import subprocess
+import sys
 import time
 import uuid
 from pathlib import Path
@@ -34,7 +35,16 @@ import pytest
 
 BROKERS = os.environ.get("FS_BROKERS", "localhost:19092")
 REPO = Path(__file__).resolve().parent.parent
-PYTHON = REPO / ".venv" / "Scripts" / "python.exe"
+
+# `sys.executable`, not a hardcoded venv path. This was
+# `REPO / ".venv" / "Scripts" / "python.exe"` — Windows-only, and doubly wrong:
+# `Scripts` is `bin` on POSIX and `python.exe` is `python`. The test spawns a
+# consumer as a subprocess, and the interpreter it should spawn is the one
+# already running the test, whatever environment that came from.
+#
+# It failed the first time CI ran, with FileNotFoundError on a path that only
+# exists on the machine it was written on.
+PYTHON = Path(sys.executable)
 
 
 def _broker_available() -> bool:
