@@ -12,9 +12,15 @@ containing v3 events and asserts the warehouse conforms them correctly.
 **The assertion that matters is the unit, not the column.** A conformance that
 coalesced `duration_ms` into `duration_s` without dividing would populate the
 column, satisfy every not-null test, and be wrong by a factor of a thousand -
-which is the exact failure the v3 chapter is about. So the test compares
-against the *manifest's* duration sum, computed by the generator before the
-pipeline saw anything.
+the exact failure the v3 chapter is about.
+
+Two assertions cover it from different directions, deliberately. One compares
+the v3 mean duration against the v1 mean, where a missing division shows up as
+a ratio near 1000. The other asserts the completeness ledger still closes, which
+is the stronger check because the ledger grades against the *manifest* - ground
+truth written by the generator before the pipeline saw anything. That is the one
+that caught the real bug here, and it was in the manifest writer rather than in
+the warehouse.
 """
 
 from __future__ import annotations
@@ -29,6 +35,12 @@ import pytest
 REPO = Path(__file__).resolve().parent.parent
 
 pytest.importorskip("duckdb", reason="needs the DuckDB target")
+
+# Excluded from the default run. It generates a shift, lands a lake and runs a
+# full dbt build - minutes, not milliseconds - and it needs `dbt deps` to have
+# installed dbt_utils first. Running inside the plain unit step is exactly how
+# it failed on its first CI run.
+pytestmark = pytest.mark.warehouse
 
 
 def _run(args: list[str], cwd: Path) -> None:

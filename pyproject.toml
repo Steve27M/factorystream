@@ -84,7 +84,10 @@ pythonpath = ["src", "."]
 testpaths = ["tests"]
 # Integration tests need a running broker. Excluded by default, because a
 # unit suite that needs Docker is a unit suite people stop running.
-addopts = "-m 'not integration'"
+# Both heavy suites are excluded by default. A unit suite that needs Docker,
+# or that builds a lake and runs dbt, is a unit suite people stop running.
+addopts = "-m 'not integration and not warehouse'"
 markers = [
     "integration: requires a running Redpanda broker (make broker)",
+    "warehouse: builds a lake and runs dbt; needs `dbt deps` to have run",
 ]

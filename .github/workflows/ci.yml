@@ -134,6 +134,10 @@ jobs:
               sys.exit(1)
           PY
 
+      - name: v3 through the warehouse
+        # After `dbt deps`, because this builds its own lake and runs dbt.
+        run: uv run pytest -q -m warehouse -rs
+
       - name: Live broker
         # A skip here means the broker never came up or the events were never
         # produced. Either way the kill-test did not run, and a skipped
