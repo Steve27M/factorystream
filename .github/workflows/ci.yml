@@ -1,0 +1,100 @@
+# Lint, types, unit tests, then the consumer against a real broker.
+#
+# The integration test is the point. A unit suite proves the dedup and
+# watermark logic is internally consistent and proves nothing about whether a
+# real Kafka client can subscribe, whether the partition count is what the
+# project assumes, or whether offsets commit. Those are the failures worth
+# catching, so CI starts a Redpanda.
+#
+# **Via docker compose, not `services:`.** Service containers map to
+# `docker create` flags, so they cannot set a command — and Redpanda needs a
+# long argument list, including the split internal/external listener that is
+# the single most common Kafka-in-Docker failure to get wrong. WearWatch's
+# workflow learned this the hard way: its first run died before any step with
+# "Failed to initialize container minio/minio".
+#
+# So CI runs the same `docker-compose.yml` a developer runs via `make broker`.
+# The broker under test is configured identically to the broker on the laptop,
+# rather than being a second definition free to drift.
+#
+# Skipping is how the integration test behaves with no broker, which is correct
+# on a laptop and dangerous here — a skipped test in CI looks exactly like a
+# passing one. The guard below turns that into a failure.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  PYTHONUNBUFFERED: "1"
+  UV_LINK_MODE: copy
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start the broker
+        # `--wait` blocks on the compose healthcheck, which asks `rpk cluster
+        # health` rather than probing the port: the port opens well before the
+        # cluster will accept a produce, and a consumer that connects too early
+        # fails in a confusing way.
+        #
+        # `topic-init` runs in the foreground because it is meant to exit. It
+        # creates the topic with the 6 partitions the project assumes — auto
+        # creation would give one partition and silently invalidate every claim
+        # about per-key ordering across partitions.
+        run: |
+          docker compose up -d --wait redpanda
+          docker compose up --exit-code-from topic-init topic-init
+
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        # `stream` is required for mypy: the consumer imports confluent_kafka at
+        # module level and there is no ignore_missing_imports override for it.
+        # `cloud` is not, because boto3 is imported inside the function that
+        # needs it and mypy already overrides it.
+        run: |
+          uv venv
+          uv pip install -e ".[dev,stream]"
+
+      - name: Lint
+        run: uv run ruff check src tests tools
+
+      - name: Types
+        run: uv run mypy
+
+      - name: Unit tests
+        run: uv run pytest -q
+
+      - name: Live broker
+        # A skip here means the broker did not come up, which must fail the
+        # build rather than pass quietly.
+        run: |
+          uv run pytest -q -m integration -rs | tee result.txt
+          if grep -qE "[0-9]+ skipped" result.txt; then
+            echo "::error::integration tests were skipped - the broker did not start"
+            exit 1
+          fi
+
+      # The dbt build is not exercised. `transform/profiles.yml` defines a
+      # single Athena target, so running it needs AWS credentials and a Glue
+      # database — and claiming a warehouse build in CI while only a broker runs
+      # would be the kind of green badge that means nothing. The reconciliation
+      # this project exists to prove is recorded, dated and checkable in
+      # evidence/2026-08-19-first-reconciliation.md instead.
+
+      - name: Stop the broker
+        if: always()
+        run: docker compose down -v
