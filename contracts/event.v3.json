@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://steve27m.github.io/factorystream/contracts/event.v3.json",
+  "title": "FactoryStream shop-floor event, v3",
+  "type": "object",
+  "required": [
+    "event_id",
+    "event_type",
+    "machine_id",
+    "event_time",
+    "publish_time",
+    "schema_version",
+    "payload"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "event_type": {
+      "enum": [
+        "cycle",
+        "defect",
+        "state_change",
+        "operator_scan"
+      ]
+    },
+    "machine_id": {
+      "type": "string",
+      "pattern": "^MW1-[AB]-0[1-4]$"
+    },
+    "event_time": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "publish_time": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "schema_version": {
+      "const": 3
+    },
+    "payload": {
+      "type": "object"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "cycle"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "required": [
+              "work_order",
+              "sku",
+              "unit_seq",
+              "duration_ms",
+              "operator_badge"
+            ],
+            "properties": {
+              "work_order": {
+                "type": "string"
+              },
+              "sku": {
+                "type": "string"
+              },
+              "unit_seq": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "operator_badge": {
+                "type": "string"
+              },
+              "line_id": {
+                "type": "string"
+              },
+              "duration_ms": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "description": "Cycle duration in MILLISECONDS. v1 and v2 carried duration_s in seconds."
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

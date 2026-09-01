@@ -241,3 +241,83 @@ cannot be trusted about the mechanism.
 placement fixed, the lesson stands: a lifecycle rule written for scratch will
 happily delete a warehouse if anything lands under the same prefix. The
 `external_location` a table declares should be somewhere no expiry rule points.
+
+---
+
+## Phase 6 — contract testing chosen over the scale chapter
+
+The spec offers three optional-depth chapters and says pick one.
+
+**Contract testing, because this project already manufactures the conditions
+for it.** The generator performs a schema cutover halfway through every run, so
+there is a stream that genuinely changes shape while it is being consumed. A
+contract chapter written against a stream that never drifts is a chapter about a
+hypothetical.
+
+**The scale chapter was the tempting pick and is the wrong one here.** Running
+these dbt patterns against ~1B rows of NYC TLC data via Athena costs real money
+to demonstrate something the Non-Goals already decline to claim, and the spec is
+explicit that a distributed engine may enter only if a chapter *measures* a
+need. Nothing has measured one, so buying the credential would be buying it
+rather than earning it.
+
+Stream-side aggregation is the runner-up and remains open.
+
+## A registry answers one question, and it is not "is this correct"
+
+The question is *would this change break a consumer that is already running* —
+answerable mechanically, before a change ships. That is why the schemas are
+files a build can read rather than prose in a README: a document cannot fail a
+build.
+
+Compatibility directions, named carefully because they are easy to state
+backwards:
+
+- **BACKWARD** — a consumer on the *new* schema reads *old* data. Matters when
+  the producer moves first.
+- **FORWARD** — a consumer on the *old* schema reads *new* data. Matters when
+  consumers cannot all be upgraded at once, which is always.
+
+A rename is not a distinct rule in the checker. It is a removal plus an
+addition, so it breaks both directions — which is exactly why renames hurt, and
+the checker derives that rather than being told it.
+
+## The blind spot is documented, because a quiet registry is worse than none
+
+v3 replaces `duration_s` (seconds, float) with `duration_ms` (milliseconds,
+integer), and the checker correctly calls it breaking.
+
+Now the change it **cannot** see: keeping the name `duration_s` and changing
+only the unit to milliseconds. Every schema check passes, every type check
+passes, every row validates, and every cycle-time aggregate downstream is wrong
+by a factor of a thousand. **JSON Schema describes shape; a unit is meaning.**
+
+`registry.SEMANTIC_CHANGES` lists three such changes by hand — the unit change,
+a redefined enum meaning, a timezone convention change — because no mechanism
+could derive them. `test_a_unit_change_that_keeps_the_name_passes_every_check`
+asserts the gap exists: a test whose *passing* is the bad news, written down so
+the limit is not forgotten by someone reading a green suite.
+
+A registry that implies full coverage converts an unknown risk into a
+believed-absent one, which is a worse position than having no registry at all.
+
+## The contract gate runs at the producer, and skips corrupt records
+
+Two decisions inside one check.
+
+**At the producer**, before anything reaches the topic: a bad record on the
+topic becomes somebody else's quarantine investigation, and the cost of catching
+it here is one exit code (exit 2, refusing to publish).
+
+**Corrupt records are skipped rather than failed.** They are unparseable by
+construction, emitted on purpose at a declared rate. Counting them as contract
+violations would make the gate fire whenever the disorder injector works
+correctly — the fastest way to get a check switched off by the person it keeps
+interrupting.
+
+Each event is validated against **the version it declares**, not against v1, for
+the same reason: the stream is supposed to change version mid-run.
+
+The gate's output also cross-checks the reconciliation from an independent
+direction — 4,243 parseable + 4 corrupt = 4,247 lines, and 4,151 deduped + 92
+injected duplicates = 4,243. Two tools counting different things and agreeing.

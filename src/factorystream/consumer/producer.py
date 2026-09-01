@@ -43,6 +43,63 @@ def _producer(brokers: str) -> Any:
     )
 
 
+def contract_check(events_path: Path) -> dict[str, Any]:
+    """Validate a file of events against the contract version each declares.
+
+    **A producer-side gate, run before anything is published.** Catching a
+    contract violation here costs one exit code; catching it downstream costs a
+    quarantine investigation, and catching it in silver costs a re-run.
+
+    Corrupt records are excluded rather than reported. They are unparseable *by
+    construction* - the disorder injector emits them on purpose at a declared
+    rate - so counting them as contract failures would make the gate fire on
+    the generator working correctly, which is the fastest way to get a check
+    switched off.
+
+    Note what this does **not** cover: a change that keeps a field's name and
+    type but alters its meaning passes every check here. See
+    `contracts.registry.SEMANTIC_CHANGES`.
+    """
+    from factorystream.contracts import validate
+
+    checked = corrupt = 0
+    by_version: dict[int, int] = {}
+    failures: list[dict[str, Any]] = []
+
+    with events_path.open(encoding="utf-8") as fh:
+        for lineno, line in enumerate(fh, 1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                parsed = json.loads(line)
+            except json.JSONDecodeError:
+                corrupt += 1
+                continue
+            if not isinstance(parsed, dict) or "_raw" in parsed:
+                corrupt += 1
+                continue
+
+            checked += 1
+            version = parsed.get("schema_version")
+            if isinstance(version, int):
+                by_version[version] = by_version.get(version, 0) + 1
+
+            errors = validate(parsed)
+            if errors:
+                failures.append(
+                    {"line": lineno, "event_id": parsed.get("event_id"), "errors": errors[:3]}
+                )
+
+    return {
+        "checked": checked,
+        "corrupt_skipped": corrupt,
+        "by_schema_version": dict(sorted(by_version.items())),
+        "failures": failures,
+        "ok": not failures,
+    }
+
+
 def publish(
     events_path: Path, brokers: str = DEFAULT_BROKERS, topic: str = TOPIC
 ) -> dict[str, int]:
@@ -100,11 +157,40 @@ def main() -> int:
     parser.add_argument("--events", type=Path, default=Path("out/events.jsonl"))
     parser.add_argument("--brokers", default=DEFAULT_BROKERS)
     parser.add_argument("--topic", default=TOPIC)
+    parser.add_argument(
+        "--skip-contract-check",
+        action="store_true",
+        help="publish without validating against the contract. For deliberately "
+        "producing invalid data in a test; never in a normal run.",
+    )
+    parser.add_argument(
+        "--contract-check-only",
+        action="store_true",
+        help="validate and report, publish nothing. This is what CI runs.",
+    )
     args = parser.parse_args()
 
     if not args.events.exists():
         print(f"no events file at {args.events} — run `make generate` first", file=sys.stderr)
         return 1
+
+    if not args.skip_contract_check:
+        check = contract_check(args.events)
+        versions = ", ".join(f"v{v}: {n:,}" for v, n in check["by_schema_version"].items())
+        print(f"contract: {check['checked']:,} events checked ({versions})")
+        print(f"          {check['corrupt_skipped']:,} corrupt records skipped, by design")
+        if not check["ok"]:
+            # Refuse to publish. A contract violation reaching the topic becomes
+            # somebody else's quarantine investigation, and the cost of finding
+            # it here is one exit code.
+            print(f"          {len(check['failures'])} CONTRACT FAILURES", file=sys.stderr)
+            for failure in check["failures"][:5]:
+                print(f"            line {failure['line']}: {failure['errors']}", file=sys.stderr)
+            return 2
+        print("          all valid against their declared version")
+
+    if args.contract_check_only:
+        return 0
 
     result = publish(args.events, args.brokers, args.topic)
     print(f"published {result['sent']:,} records to {args.topic}")

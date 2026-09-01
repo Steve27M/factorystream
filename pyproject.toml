@@ -19,6 +19,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+contracts = [
+    # The event contract is validated at the producer, so this is a runtime
+    # dependency of a normal `make publish`, not a dev tool.
+    "jsonschema>=4.20.0",
+]
 dev = [
     "pytest>=8.2.0",
     "ruff>=0.5.0",
@@ -62,8 +67,10 @@ packages = ["factorystream"]
 
 # Neither ships type stubs or a py.typed marker. `boto3-stubs` exists but pulls
 # a large generated dependency for the handful of calls this project makes.
+# `jsonschema` ships stubs only via types-jsonschema, which types the validator
+# API loosely enough to be worth less than the install.
 [[tool.mypy.overrides]]
-module = ["pyarrow.*", "boto3.*", "botocore.*"]
+module = ["pyarrow.*", "boto3.*", "botocore.*", "jsonschema.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

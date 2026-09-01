@@ -39,6 +39,12 @@ broker-ui:  ## Optional Redpanda console on :8080 — partition + lag view for t
 broker-down:  ## Stop the broker. Add `-v` yourself to drop the volume too.
 	docker compose down
 
+contracts:  ## Compatibility matrix across contract versions, and what it cannot see.
+	python -m factorystream.contracts.report
+
+contract-check:  ## Validate out/events.jsonl against each event's declared version.
+	python -m factorystream.consumer.producer --events out/events.jsonl --contract-check-only
+
 publish:  ## Produce the generated events to the topic. Corrupt payloads go as-is.
 	python -m factorystream.consumer.producer --events out/events.jsonl
 

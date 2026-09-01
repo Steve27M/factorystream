@@ -67,7 +67,7 @@ jobs:
         # needs it and mypy already overrides it.
         run: |
           uv venv
-          uv pip install -e ".[dev,stream]"
+          uv pip install -e ".[dev,stream,contracts]"
 
       - name: Lint
         run: uv run ruff check src tests tools
@@ -78,14 +78,24 @@ jobs:
       - name: Unit tests
         run: uv run pytest -q
 
-      - name: Generate a shift and publish it
+      - name: Generate a shift
+        run: uv run python -m factorystream.generator.cli --config plant/scenario.yaml --out out/
+
+      - name: Contract check
+        # The producer-side gate, run as a check rather than as a publish.
+        # A contract violation reaching the topic becomes somebody else's
+        # quarantine investigation; the cost of finding it here is one exit
+        # code.
+        run: |
+          uv run python -m factorystream.contracts.report
+          uv run python -m factorystream.consumer.producer             --events out/events.jsonl --contract-check-only
+
+      - name: Publish to the topic
         # The kill-test replays `out/events.jsonl` and compares what landed
         # against what was produced, so it needs real events on the topic. Two
         # of the three integration tests skip without this file, and the first
         # CI run proved the guard below catches that rather than passing.
-        run: |
-          uv run python -m factorystream.generator.cli --config plant/scenario.yaml --out out/
-          uv run python -m factorystream.consumer.producer --events out/events.jsonl
+        run: uv run python -m factorystream.consumer.producer --events out/events.jsonl
 
       - name: Live broker
         # A skip here means the broker never came up or the events were never

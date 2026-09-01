@@ -9,10 +9,12 @@ schema-drifting events, **on purpose, at declared rates**) → a Kafka-API broke
 → Glue + Athena → dbt into a Kimball star → **exact reconciliation against a per-window
 manifest**. All AWS resources are Terraform; nothing is created by console.
 
-> **Status:** Phase 1 and the AWS medallion complete. 78 tests, **523 of 523 windows
-> reconciling exactly**. Later phases (broker semantics depth, operate-in-public) are
-> not built yet — the spec is [`README-factorystream.md`](README-factorystream.md) and
-> what is done is dated in [`docs/stages/`](docs/stages).
+> **Status:** Phases 0–4 and 6 complete. 96 tests, **523 of 523 windows reconciling
+> exactly**, and a versioned event contract gated at the producer. Phase 5's
+> destroy/rebuild acceptance run is deliberately deferred — the account module holds
+> guardrails a sibling project is currently relying on ([`docs/stages/5.md`](docs/stages/5.md)).
+> Each phase is dated in [`docs/stages/`](docs/stages); the spec is
+> [`README-factorystream.md`](README-factorystream.md).
 
 Built in parallel with **WearWatch** on a shared plant canon — one fictional factory,
 simulated by both, read from [`plant/canon.yaml`](plant/canon.yaml). The two are
@@ -69,6 +71,38 @@ of those untestable.
 Each one appears in the reconciliation above as a named quantity. A disorder class you
 cannot point to in the arithmetic is a disorder class you have not actually handled.
 
+## The contract, and what a registry cannot promise
+
+Three JSON Schemas in [`contracts/`](contracts), a compatibility checker, and a gate that
+runs at the producer before anything reaches the topic.
+
+```
+v1 -> v2: NONE
+  added_field    payload.line_id            optional
+  added_field    payload.operator_badge     required in the new version  [breaks backward]
+  removed_field  payload.operator           required in the old version  [breaks forward]
+```
+
+A rename is not a distinct rule — it is a removal plus an addition, so it breaks both
+directions. That is exactly why renames hurt, and the checker derives it rather than
+being told.
+
+**And the part worth reading twice.** v3 replaces `duration_s` (seconds) with
+`duration_ms` (milliseconds), which the checker catches. The change it *cannot* catch is
+keeping the name `duration_s` and changing only the unit. Every schema check passes,
+every type check passes, every row validates, and every downstream aggregate is wrong by
+a factor of a thousand — because **JSON Schema describes shape and a unit is meaning**.
+
+`SEMANTIC_CHANGES` lists three such blind spots by hand, and a test asserts the gap is
+real. It is a test whose *passing* is the bad news, written down so the limit is not
+forgotten by someone reading a green suite. A registry that implies full coverage
+converts an unknown risk into a believed-absent one.
+
+```bash
+make contracts        # the compatibility matrix, and what it cannot see
+make contract-check   # validate out/events.jsonl against declared versions
+```
+
 ## Layout
 
 ```
@@ -77,6 +111,8 @@ src/factorystream/consumer/    broker consumer, offsets, dedup, quarantine
 transform/                     dbt: staging -> silver -> gold -> recon
 infra/terraform/account/       account-level guardrails: budgets, CUR, shared workgroup
 infra/terraform/app/           the pipeline's own resources
+contracts/                     event.v1/v2/v3 JSON Schemas — the versioned contract
+src/factorystream/contracts/   registry: validate, diff, compatibility classes
 tools/                         teardown_verify.py, build_status_page.py
 evidence/                      dated ledger, including the first exact reconciliation
 plant/canon.yaml               the shared fictional factory
@@ -101,7 +137,7 @@ python tools/teardown_verify.py --all-regions
 
 ```bash
 make help                  # the entry points
-pytest                     # 78 tests
+pytest                     # 96 tests
 pytest -m integration      # needs the broker (make broker)
 ```
 
