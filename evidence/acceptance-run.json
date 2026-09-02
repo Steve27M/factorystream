@@ -1,0 +1,38 @@
+{
+  "started_at": "2026-09-02T22:14:08.438880+00:00",
+  "before": {
+    "ledger": [
+      "523",
+      "0"
+    ],
+    "bronze": [
+      "4243"
+    ],
+    "objects": 82
+  },
+  "destroyed": {
+    "lake_bucket_present": false
+  },
+  "after": {
+    "ledger": [
+      "523",
+      "0"
+    ],
+    "bronze": [
+      "4243"
+    ],
+    "objects": 82
+  },
+  "phases_seconds": {
+    "before: grade the live stack": 13.9,
+    "destroy the app layer": 7.7,
+    "rebuild from Terraform": 60.5,
+    "replay into the empty lake": 33.3,
+    "dbt build on Athena": 56.7,
+    "after: grade the rebuilt stack": 11.3
+  },
+  "total_seconds": 183.4,
+  "reconciliation_identical": true,
+  "scope": "infra/terraform/app only; the account module (budgets, CUR, shared workgroup) was deliberately left standing",
+  "finished_at": "2026-09-02T22:17:12.213705+00:00"
+}
