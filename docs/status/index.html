@@ -56,6 +56,22 @@
   <h1>FactoryStream — completeness ledger</h1>
   <p class=sub>Every 15-minute window, reconciled against generator ground truth.</p>
 
+  <div class="verdict" style="color:var(--warn);margin-bottom:1.5rem">
+    Frozen snapshot — the AWS stack was destroyed on 2026-09-02
+    <small>These numbers were read from Athena while the stack was live, and the
+    Phase&nbsp;5 acceptance run reproduced them exactly after destroying and rebuilding
+    the lake from nothing: 523/523 before, 523/523 after, 183 seconds. The stack was
+    then torn down and the account verified empty across 17 regions.
+    <br><br>
+    This page cannot be regenerated, and that is a flaw worth naming rather than
+    hiding: <code>tools/build_status_page.py</code> queries Athena directly, so it
+    needs the very infrastructure whose removal the project treats as a success.
+    The sibling project's equivalent builds from committed evidence instead and still
+    renders. Everything here remains checkable — <code>make generate</code> and
+    <code>make build-duckdb</code> reproduce the reconciliation from the seed with no
+    cloud account at all.</small>
+  </div>
+
   <div class="verdict good">
     Every one of 523 windows reconciles exactly
     <small>Ground truth is written directly to storage by the generator and never

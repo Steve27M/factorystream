@@ -12,6 +12,22 @@ Reads Athena directly rather than going through dbt, because the page is a
 *view* of the warehouse and adding a dbt run to a rendering step would couple
 publication to a build.
 
+**That decision has a cost, and the teardown proved it.** Reading Athena means
+this script needs live infrastructure — so the moment the stack was destroyed on
+2026-09-02 it stopped working:
+
+    InvalidRequestException: WorkGroup is not found
+
+For a project whose thesis is that the cloud is a reversible choice, a publisher
+that dies with the cloud is the wrong shape. The sibling project's equivalent
+builds from committed `evidence/` and still renders after its own teardown; this
+one should read the committed ledger too, or a DuckDB build over the local lake,
+either of which would work with no account at all.
+
+Left as-is and documented rather than rewritten, because the page it produced is
+still correct as a dated snapshot and the fix belongs to whoever next needs to
+regenerate it. `docs/status/index.html` now says so on its face.
+
     python tools/build_status_page.py --out docs/status/index.html
 """
 

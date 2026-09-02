@@ -9,10 +9,14 @@ schema-drifting events, **on purpose, at declared rates**) → a Kafka-API broke
 → Glue + Athena → dbt into a Kimball star → **exact reconciliation against a per-window
 manifest**. All AWS resources are Terraform; nothing is created by console.
 
-> **Status:** Phases 0–4 and 6 complete. 100 tests, **523 of 523 windows reconciling
-> exactly on two engines**, and a versioned event contract gated at the producer. Phase 5's
-> destroy/rebuild acceptance run is deliberately deferred — the account module holds
-> guardrails a sibling project is currently relying on ([`docs/stages/5.md`](docs/stages/5.md)).
+> **Status:** complete. Phases 0–6 done, 100 tests, **523 of 523 windows reconciling
+> exactly on two engines**, and a versioned event contract gated at the producer.
+> The Phase 5 acceptance run destroyed the app layer and rebuilt it: **523/523 before,
+> 523/523 after, from a lake that did not exist in between**, in 183 seconds
+> ([`docs/stages/5.md`](docs/stages/5.md)). **The AWS stack was then torn down on
+> 2026-09-02** and the account verified empty across 17 regions.
+> Nothing here needs a cloud account to check — the pipeline runs from `make generate`
+> onward and the warehouse builds on DuckDB over the same parquet the consumer writes.
 > Each phase is dated in [`docs/stages/`](docs/stages); the spec is
 > [`README-factorystream.md`](README-factorystream.md).
 
